@@ -516,6 +516,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 import { getStorage, ref as stRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-storage.js";
 
@@ -530,11 +531,18 @@ const firebaseConfig = {
 };
 
 const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
 const db = getDatabase(fbApp);
 const storage = getStorage(fbApp);
 
-window.fb = { db, ref, set, get, onValue, update, storage, stRef, uploadBytes, getDownloadURL };
-window.dispatchEvent(new Event('fb-ready'));
+signInAnonymously(auth).then(() => {
+    console.log("🔐 Safety Auth Success (Anonymous)");
+    window.fb = { auth, db, ref, set, get, onValue, update, storage, stRef, uploadBytes, getDownloadURL };
+    window.dispatchEvent(new Event('fb-ready'));
+}).catch(err => {
+    console.error("❌ Safety Auth Error:", err);
+    alert("ระบบความปลอดภัยขัดข้อง (Auth): " + err.message + "\n\nกรุณาตรวจสอบการเปิดใช้งาน Anonymous Auth ใน Firebase Console");
+});
 </script>
 
 <script>
@@ -564,13 +572,19 @@ const app = {
         else window.addEventListener('fb-ready', () => this.load());
     },
     load() {
+        console.log('📡 Safety Loading...');
         this.showLoading('Connecting...');
         window.fb.onValue(window.fb.ref(window.fb.db, 'safety_passports'), (snap) => {
+            console.log('✅ Safety Data Received');
             this.hideLoading();
             const data = snap.val();
             this.users = data ? Object.values(data) : [];
             this.checkSession();
             if (this.editingId) this.openAdminModal(this.editingId);
+        }, (err) => {
+            console.error('❌ Safety Load Error:', err);
+            this.hideLoading();
+            alert('ไม่สามารถโหลดข้อมูลได้ (Permission Denied): ' + err.message);
         });
     },
     checkSession() {
